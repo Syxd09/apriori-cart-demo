@@ -44,16 +44,16 @@ interface Recommendation {
 }
 
 const products: Product[] = [
-  { id: 1, name: "Milk", price: 3.99, emoji: "🥛", category: "Dairy" },
-  { id: 2, name: "Bread", price: 2.49, emoji: "🍞", category: "Bakery" },
-  { id: 3, name: "Eggs", price: 4.29, emoji: "🥚", category: "Dairy" },
-  { id: 4, name: "Butter", price: 5.49, emoji: "🧈", category: "Dairy" },
-  { id: 5, name: "Cheese", price: 6.99, emoji: "🧀", category: "Dairy" },
-  { id: 6, name: "Coffee", price: 8.99, emoji: "☕", category: "Beverages" },
-  { id: 7, name: "Sugar", price: 3.49, emoji: "🧂", category: "Pantry" },
-  { id: 8, name: "Crackers", price: 4.99, emoji: "🍘", category: "Snacks" },
-  { id: 9, name: "Tomatoes", price: 3.79, emoji: "🍅", category: "Produce" },
-  { id: 10, name: "Pasta", price: 2.99, emoji: "🍝", category: "Pantry" },
+  { id: 1, name: "Milk", price: 100, emoji: "🥛", category: "Dairy" },
+  { id: 2, name: "Bread", price: 50, emoji: "🍞", category: "Bakery" },
+  { id: 3, name: "Eggs", price: 59, emoji: "🥚", category: "Dairy" },
+  { id: 4, name: "Butter", price: 179, emoji: "🧈", category: "Dairy" },
+  { id: 5, name: "Cheese", price: 299, emoji: "🧀", category: "Dairy" },
+  { id: 6, name: "Coffee", price: 49, emoji: "☕", category: "Beverages" },
+  { id: 7, name: "Sugar", price: 35, emoji: "🧂", category: "Pantry" },
+  { id: 8, name: "Crackers", price: 55, emoji: "🍘", category: "Snacks" },
+  { id: 9, name: "Tomatoes", price: 45, emoji: "🍅", category: "Produce" },
+  { id: 10, name: "Pasta", price: 69, emoji: "🍝", category: "Pantry" },
 ];
 
 const categories = ["All", ...Array.from(new Set(products.map(p => p.category)))];
@@ -66,6 +66,7 @@ const Index = () => {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [appliedRules, setAppliedRules] = useState<AprioriRule[]>([]);
   const [newRecommendation, setNewRecommendation] = useState<string | null>(null);
+  const [isCartOpen, setIsCartOpen] = useState(false);
 
   useEffect(() => {
     // Load Apriori rules
@@ -196,7 +197,7 @@ const Index = () => {
               <div>
                 <h1 className="text-2xl font-bold text-foreground">SmartMart</h1>
                 <p className="text-sm text-muted-foreground">
-                  AI-Powered Shopping with Apriori Algorithm
+                  Shopping with Apriori Algorithm
                 </p>
               </div>
             </div>
@@ -210,14 +211,17 @@ const Index = () => {
                   </Badge>
                 </div>
               )}
-              <div className="flex items-center gap-2">
+              <button
+                onClick={() => setIsCartOpen(!isCartOpen)}
+                className="flex items-center gap-2 hover:bg-accent rounded p-1 transition-colors"
+              >
                 <ShoppingCart className="h-5 w-5 text-muted-foreground" />
                 {totalItems > 0 && (
                   <Badge className="bg-cart-badge text-white animate-pop">
                     {totalItems}
                   </Badge>
                 )}
-              </div>
+              </button>
             </div>
           </div>
         </div>
@@ -290,7 +294,7 @@ const Index = () => {
                               {product.category}
                             </Badge>
                             <p className="text-xl font-bold text-primary">
-                              ${product.price.toFixed(2)}
+                              ₹{product.price.toFixed(2)}
                             </p>
                           </div>
                         </div>
@@ -346,7 +350,8 @@ const Index = () => {
             )}
 
             {/* Shopping Cart */}
-            <Card className="p-6 sticky top-24">
+            <div className={`overflow-hidden transition-all duration-300 ease-in-out ${isCartOpen ? 'max-h-[800px] opacity-100' : 'max-h-0 opacity-0'}`}>
+              <Card className="p-6 sticky top-24">
               <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-2">
                   <ShoppingCart className="h-5 w-5 text-primary" />
@@ -389,13 +394,13 @@ const Index = () => {
                               {item.name}
                             </p>
                             <p className="text-xs text-muted-foreground">
-                              ${item.price.toFixed(2)} × {item.quantity}
+                              ₹{item.price.toFixed(2)} × {item.quantity}
                             </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
                           <span className="font-semibold text-sm">
-                            ${(item.price * item.quantity).toFixed(2)}
+                            ₹{(item.price * item.quantity).toFixed(2)}
                           </span>
                           <Button
                             variant="outline"
@@ -414,12 +419,12 @@ const Index = () => {
                   <div className="space-y-3">
                     <div className="flex justify-between items-center">
                       <span className="text-muted-foreground">Subtotal:</span>
-                      <span className="font-semibold">${cartTotal.toFixed(2)}</span>
+                      <span className="font-semibold">₹{cartTotal.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between items-center text-lg">
                       <span className="font-semibold text-foreground">Total:</span>
                       <span className="text-2xl font-bold text-primary">
-                        ${cartTotal.toFixed(2)}
+                        ₹{cartTotal.toFixed(2)}
                       </span>
                     </div>
                     <Button className="w-full" size="lg">
@@ -429,6 +434,7 @@ const Index = () => {
                 </>
               )}
             </Card>
+           </div>
 
             {/* Recommendations */}
             {recommendations.length > 0 && (
@@ -470,7 +476,7 @@ const Index = () => {
                                 </Badge>
                               </div>
                               <p className="text-sm font-bold text-primary">
-                                ${product.price.toFixed(2)}
+                                ₹{product.price.toFixed(2)}
                               </p>
                             </div>
                           </div>
