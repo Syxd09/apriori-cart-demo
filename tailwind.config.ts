@@ -52,6 +52,8 @@ export default {
           DEFAULT: "hsl(var(--recommendation))",
           border: "hsl(var(--recommendation-border))",
         },
+        success: "hsl(var(--success))",
+        info: "hsl(var(--info))",
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",

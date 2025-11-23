@@ -41,6 +41,11 @@ All colors MUST be HSL.
     --cart-badge: 0 84% 60%;
     --recommendation: 47 100% 92%;
     --recommendation-border: 47 100% 70%;
+    --success: 142 76% 36%;
+    --info: 217 91% 60%;
+    
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    --shadow-glow: 0 0 20px hsl(var(--primary) / 0.15);
 
     --sidebar-background: 0 0% 98%;
 
@@ -91,6 +96,8 @@ All colors MUST be HSL.
     --cart-badge: 0 84% 60%;
     --recommendation: 47 80% 25%;
     --recommendation-border: 47 80% 45%;
+    --success: 142 76% 42%;
+    --info: 217 91% 60%;
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -109,5 +116,53 @@ All colors MUST be HSL.
 
   body {
     @apply bg-background text-foreground;
+  }
+}
+
+@layer utilities {
+  .animate-slide-in {
+    animation: slideIn 0.3s ease-out;
+  }
+  
+  .animate-pop {
+    animation: pop 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  }
+  
+  .animate-glow {
+    animation: glow 2s ease-in-out infinite;
+  }
+  
+  @keyframes slideIn {
+    from {
+      opacity: 0;
+      transform: translateY(-10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes pop {
+    0% {
+      transform: scale(0.8);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1.05);
+    }
+    100% {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+  
+  @keyframes glow {
+    0%, 100% {
+      box-shadow: 0 0 5px hsl(var(--primary) / 0.2);
+    }
+    50% {
+      box-shadow: 0 0 20px hsl(var(--primary) / 0.4);
+    }
   }
 }
