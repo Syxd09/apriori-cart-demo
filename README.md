@@ -110,9 +110,3 @@ The Apriori rules in `rules.json` are based on typical grocery store transaction
 - Rules are preloaded for instant performance
 - Perfect for quick demonstrations
 - Easily extendable with more products/rules
-
-## 🔗 Learn More
-
-- [Lovable Documentation](https://docs.lovable.dev/)
-- [Apriori Algorithm](https://en.wikipedia.org/wiki/Apriori_algorithm)
-- [Market Basket Analysis](https://en.wikipedia.org/wiki/Affinity_analysis)
