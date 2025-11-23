@@ -47,6 +47,11 @@ export default {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        "cart-badge": "hsl(var(--cart-badge))",
+        recommendation: {
+          DEFAULT: "hsl(var(--recommendation))",
+          border: "hsl(var(--recommendation-border))",
+        },
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
