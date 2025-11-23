@@ -8,11 +8,14 @@ This is a 5-minute classroom presentation demo that showcases how association ru
 
 ## ✨ Features
 
-- **Product Catalog**: 10 common supermarket items
+- **Enhanced Product Catalog**: 100+ realistic supermarket items across 12 categories
 - **Shopping Cart**: Add/remove items with live updates
-- **Smart Recommendations**: Real-time suggestions based on Apriori association rules
-- **Visual Feedback**: Clear explanations of why items are recommended
-- **Responsive Design**: Works on desktop and mobile
+- **Advanced Smart Recommendations**: Real-time suggestions using enhanced Apriori algorithm with multiple quality metrics (conviction, leverage, jaccard, cosine, kulczynski, imbalance ratio)
+- **Product Details**: Individual product pages with personalized recommendations
+- **Visual Feedback**: Clear explanations of why items are recommended with comprehensive confidence scores
+- **Algorithm Insights**: Live statistics showing active rules, enhanced metrics, and recommendation quality
+- **Responsive Design**: Works seamlessly on desktop and mobile
+- **Performance Optimized**: Rules cached in localStorage for fast loading
 
 ## 🚀 How to Run
 
@@ -40,24 +43,15 @@ Then open `http://localhost:8080` in your browser.
 ## 📊 How It Works
 
 ### Apriori Algorithm
-The recommendation system uses pre-computed association rules stored in `public/rules.json`. These rules were derived from market basket analysis:
+The recommendation system dynamically computes association rules in real-time using the Apriori algorithm on simulated transaction data. The algorithm finds patterns in shopping behavior:
 
 - **Antecedent**: Items already in cart
 - **Consequent**: Items to recommend
 - **Confidence**: Probability of buying consequent given antecedent
 - **Support**: Frequency of the itemset
 
-### Example Rule
-```json
-{
-  "antecedent": ["Milk"],
-  "consequent": ["Bread"],
-  "confidence": 0.72,
-  "support": 0.35
-}
-```
-
-This means: "72% of customers who bought Milk also bought Bread"
+### Dynamic Rule Generation
+Rules are computed on page load from 2000+ simulated transactions with realistic grocery shopping patterns using customer segments and temporal behaviors. The enhanced algorithm uses optimized parameters (2% minimum support, 25% minimum confidence) and filters rules with multiple quality metrics (lift > 1.1, conviction > 1.2, leverage > 0.01) for better relevance. For example, if the algorithm finds that 72% of transactions containing Milk also contain Bread, it creates the rule: "Milk → Bread" with additional quality metrics.
 
 ### Real-time Recommendations
 1. User adds items to cart
@@ -69,12 +63,15 @@ This means: "72% of customers who bought Milk also bought Bread"
 
 ```
 ├── src/
+│   ├── lib/
+│   │   └── apriori.ts          # Apriori algorithm implementation
 │   ├── pages/
-│   │   └── Index.tsx          # Main application page
-│   ├── index.css              # Design system & styles
+│   │   ├── Index.tsx           # Main shopping page with recommendations
+│   │   ├── ProductDetail.tsx   # Individual product pages
+│   │   └── NotFound.tsx        # 404 error page
+│   ├── components/ui/          # Reusable UI components
+│   ├── index.css               # Design system & styles
 │   └── ...
-├── public/
-│   └── rules.json             # Apriori association rules
 └── README.md
 ```
 
@@ -83,11 +80,11 @@ This means: "72% of customers who bought Milk also bought Bread"
 - **Frontend**: React + TypeScript
 - **Styling**: Tailwind CSS
 - **Build Tool**: Vite
-- **Algorithm**: Apriori (pre-computed rules)
+- **Algorithm**: Apriori (computed dynamically)
 
 ## 📖 Dataset
 
-The Apriori rules in `rules.json` are based on typical grocery store transaction patterns. In a real-world scenario, these would be computed from actual transaction data using Python libraries like `mlxtend` or `apyori`.
+The system generates 2000+ realistic supermarket transactions on page load, using customer segments, temporal patterns, and shopping behaviors. The enhanced Apriori algorithm analyzes these transactions to discover association rules with multiple quality metrics. In a real-world scenario, this would use actual transaction data from a retail database.
 
 ## 🎓 For Presentation
 
@@ -107,12 +104,12 @@ The Apriori rules in `rules.json` are based on typical grocery store transaction
 ## 📝 Notes
 
 - No backend required - everything runs in the browser
-- Rules are preloaded for instant performance
-- Perfect for quick demonstrations
-- Easily extendable with more products/rules
+- Rules are computed once and cached in localStorage for fast subsequent loads
+- Optimized algorithm parameters for better recommendation quality
+- Perfect for quick demonstrations and educational purposes
+- Easily extendable with more products or transaction patterns
 
 ## 🔗 Learn More
 
-- [Lovable Documentation](https://docs.lovable.dev/)
 - [Apriori Algorithm](https://en.wikipedia.org/wiki/Apriori_algorithm)
 - [Market Basket Analysis](https://en.wikipedia.org/wiki/Affinity_analysis)

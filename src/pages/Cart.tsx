@@ -1,0 +1,685 @@
+import { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
+import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
+import {
+  ShoppingCart,
+  TrendingUp,
+  Sparkles,
+  ArrowLeft,
+  Trash2,
+  Plus,
+  Minus,
+  Package,
+  Truck,
+  Shield,
+  RotateCcw
+} from "lucide-react";
+import { toast } from "sonner";
+import { runAprioriAlgorithm, sampleTransactions, PRODUCT_CATALOG } from "@/lib/apriori";
+import { safeSync, SmartMartError, ERROR_CODES, getErrorMessage } from "@/lib/errorHandler";
+import { EmptyCartState, NoRecommendationsState } from "@/components/ErrorState";
+import Footer from "@/components/Footer";
+import type {
+  Product,
+  CartItem,
+  AprioriRule,
+  Recommendation,
+  AlgorithmStats
+} from "@/types";
+
+// Generate comprehensive product catalog from apriori data
+const generateProductsFromCatalog = (): Product[] => {
+  const products: Product[] = [];
+  let id = 1;
+
+  // Emoji mappings for categories
+  const categoryEmojis: Record<string, string> = {
+    fruits: '🍎', vegetables: '🥕', dairy: '🥛', meat: '🥩', bakery: '🍞',
+    grains: '🌾', canned: '🥫', condiments: '🧂', beverages: '🥤', alcohol: '🍷',
+    snacks: '🍿', sweets: '🍪', frozen: '🧊', health: '💊', household: '🧺',
+    personal: '🧴', baby: '👶', pet: '🐕'
+  };
+
+  // Price ranges for categories (in INR)
+  const priceRanges: Record<string, [number, number]> = {
+    fruits: [40, 200], vegetables: [25, 150], dairy: [50, 300], meat: [150, 600],
+    bakery: [30, 500], grains: [50, 150], canned: [40, 120], condiments: [30, 400],
+    beverages: [20, 150], alcohol: [200, 800], snacks: [20, 150], sweets: [50, 300],
+    frozen: [100, 400], health: [100, 500], household: [50, 300], personal: [80, 400],
+    baby: [100, 600], pet: [150, 800]
+  };
+
+  Object.entries(PRODUCT_CATALOG).forEach(([category, items]) => {
+    const emoji = categoryEmojis[category] || '📦';
+    const [minPrice, maxPrice] = priceRanges[category] || [50, 200];
+    const categoryName = category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+
+    items.forEach((itemName: string) => {
+      // Generate realistic price within range
+      const price = Math.round((minPrice + Math.random() * (maxPrice - minPrice)) / 5) * 5; // Round to nearest 5
+
+      products.push({
+        id,
+        name: itemName,
+        price,
+        emoji,
+        category: categoryName,
+        inStock: true
+      });
+      id++;
+    });
+  });
+
+  return products;
+};
+
+const products: Product[] = generateProductsFromCatalog();
+
+const Cart = () => {
+  const navigate = useNavigate();
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [rules, setRules] = useState<AprioriRule[]>([]);
+  const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
+  const [appliedRules, setAppliedRules] = useState<AprioriRule[]>([]);
+  const [newRecommendation, setNewRecommendation] = useState<string | null>(null);
+  const [algorithmStats, setAlgorithmStats] = useState<AlgorithmStats | null>(null);
+  const [isLoadingRules, setIsLoadingRules] = useState(true);
+  const prevRecommendationsLength = useRef(0);
+  const prevRecommendations = useRef<Recommendation[]>([]);
+
+  useEffect(() => {
+    // Load cart from localStorage
+    const result = safeSync(() => {
+      const savedCart = localStorage.getItem('smartmart-cart');
+      if (savedCart) {
+        const parsedCart = JSON.parse(savedCart);
+        // Validate cart structure
+        if (Array.isArray(parsedCart)) {
+          setCart(parsedCart);
+        } else {
+          throw new SmartMartError('Invalid cart data structure', ERROR_CODES.CART_STORAGE_ERROR);
+        }
+      }
+    }, 'loadCartFromStorage');
+
+    if (result.error) {
+      console.error('Failed to load cart:', result.error);
+      toast.error('Failed to load your cart. Starting with empty cart.');
+    }
+
+    // Check if rules are cached with current parameters
+    const cacheVersion = 'v2'; // Increment when parameters change
+    const cachedRules = localStorage.getItem('smartmart-apriori-rules');
+    const cachedStats = localStorage.getItem('smartmart-algorithm-stats');
+    const cachedVersion = localStorage.getItem('smartmart-cache-version');
+
+    if (cachedRules && cachedStats && cachedVersion === cacheVersion) {
+      const loadResult = safeSync(() => {
+        const parsedRules = JSON.parse(cachedRules);
+        const parsedStats = JSON.parse(cachedStats);
+        if (Array.isArray(parsedRules) && typeof parsedStats === 'object') {
+          setRules(parsedRules);
+          setAlgorithmStats(parsedStats);
+        } else {
+          throw new SmartMartError('Invalid cached data structure', ERROR_CODES.ALGORITHM_EXECUTION_FAILED);
+        }
+      }, 'loadCachedRules');
+
+      if (loadResult.error) {
+        console.error('Error loading cached rules, computing fresh:', loadResult.error);
+        computeRules();
+      } else {
+        setIsLoadingRules(false);
+      }
+    } else {
+      computeRules();
+    }
+
+    function computeRules() {
+      setIsLoadingRules(true);
+      const result = safeSync(() => {
+        // Compute enhanced Apriori association rules from sample transaction data
+        // Optimized parameters: 1% minimum support for better coverage, 20% minimum confidence for quality
+        const { associationRules: rawRules, frequentItemsets, stats: miningStats } = runAprioriAlgorithm(sampleTransactions, 0.01, 0.20);
+
+        // Keep all rules generated by the algorithm
+        const associationRules = rawRules;
+
+        console.log('📊 Raw rules generated:', rawRules.length);
+        console.log('🎯 Filtered rules (lift > 1.0):', associationRules.length);
+        if (associationRules.length > 0) {
+          console.log('Sample rules:', associationRules.slice(0, 3).map(r => `${r.antecedent.join(' + ')} => ${r.consequent.join(' + ')} (conf: ${(r.confidence * 100).toFixed(1)}%)`));
+        }
+
+        setRules(associationRules);
+        const stats: AlgorithmStats = {
+          totalTransactions: miningStats.totalTransactions,
+          minSupport: 0.02,
+          minConfidence: 0.25,
+          frequentItemsetsCount: miningStats.totalItemsets,
+          executionTime: miningStats.miningTimeMs,
+          lastUpdated: new Date()
+        };
+        setAlgorithmStats(stats);
+
+        // Cache the results
+        localStorage.setItem('smartmart-apriori-rules', JSON.stringify(associationRules));
+        localStorage.setItem('smartmart-algorithm-stats', JSON.stringify(stats));
+        localStorage.setItem('smartmart-cache-version', 'v2');
+
+        return { associationRules, stats };
+      }, 'computeAprioriRules');
+
+      setIsLoadingRules(false);
+
+      if (result.error) {
+        console.error('Failed to compute Apriori rules:', result.error);
+        toast.error('Failed to generate product recommendations. Some features may not work properly.');
+        // Set empty state
+        setRules([]);
+        setAlgorithmStats(null);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    // Save cart to localStorage whenever it changes
+    const result = safeSync(() => {
+      localStorage.setItem('smartmart-cart', JSON.stringify(cart));
+    }, 'saveCartToStorage');
+
+    if (result.error) {
+      console.error('Failed to save cart to storage:', result.error);
+      toast.error('Failed to save cart changes. Your cart may not persist.');
+    }
+  }, [cart]);
+
+  useEffect(() => {
+    // Generate recommendations based on cart
+    if (cart.length === 0 || rules.length === 0) {
+      setRecommendations([]);
+      setAppliedRules([]);
+      return;
+    }
+
+    const cartItemSet = new Set(cart.map((item) => item.name));
+    const recommendedMap = new Map<string, { reasons: string[]; confidence: number; support: number }>();
+    const rulesApplied: AprioriRule[] = [];
+
+    rules.forEach((rule) => {
+      // Check if all antecedent items are in cart and rule meets quality thresholds
+      const hasAllAntecedents = rule.antecedent.every((item) =>
+        cartItemSet.has(item)
+      );
+      const hasGoodConfidence = rule.confidence > 0.2; // Only show rules with confidence > 20%
+
+      if (hasAllAntecedents && hasGoodConfidence) {
+        rulesApplied.push(rule);
+        rule.consequent.forEach((consequentItem) => {
+          // Don't recommend items already in cart
+          if (!cartItemSet.has(consequentItem)) {
+            const score = (rule.confidence * (rule.lift || 1) * (rule.kulczynski || 1)) / 3;
+            const existing = recommendedMap.get(consequentItem);
+            if (!existing) {
+              recommendedMap.set(consequentItem, {
+                reasons: [rule.antecedent.join(' and ')],
+                confidence: rule.confidence,
+                support: rule.support,
+              });
+            } else {
+              const newReason = rule.antecedent.join(' and ');
+              if (!existing.reasons.includes(newReason)) {
+                existing.reasons.push(newReason);
+              }
+              const newScore = (rule.confidence * (rule.lift || 1) * (rule.kulczynski || 1)) / 3;
+              const existingScore = (existing.confidence * 1.1 * 1) / 3; // Approximate existing score
+              if (newScore > existingScore) {
+                existing.confidence = rule.confidence;
+                existing.support = rule.support;
+              }
+            }
+          }
+        });
+      }
+    });
+
+    console.log('🎯 Applied rules:', rulesApplied.length);
+    console.log('💡 Recommendations generated:', recommendedMap.size);
+    if (recommendedMap.size > 0) {
+      console.log('Recommended items:', Array.from(recommendedMap.keys()));
+    }
+
+    const recommendationsList = Array.from(recommendedMap.entries())
+      .map(([product, data]) => ({
+        product,
+        reason: data.reasons,
+        confidence: data.confidence,
+        support: data.support,
+      }))
+      .sort((a, b) => {
+        if (b.confidence !== a.confidence) return b.confidence - a.confidence;
+        return b.support - a.support;
+      });
+
+    // Check for new recommendations
+    if (recommendationsList.length > prevRecommendationsLength.current) {
+      const newRec = recommendationsList.find(
+        r => !prevRecommendations.current.some(existing => existing.product === r.product)
+      );
+      if (newRec) {
+        setNewRecommendation(newRec.product);
+        setTimeout(() => setNewRecommendation(null), 2000);
+      }
+    }
+    prevRecommendationsLength.current = recommendationsList.length;
+    prevRecommendations.current = [...recommendationsList];
+
+    // If no recommendations found, show fallback based on most frequent items
+    if (recommendationsList.length === 0 && rules.length > 0) {
+      console.log('⚠️ No recommendations found, using fallback');
+      // Get most frequent items from rules
+      const itemFrequency = new Map<string, number>();
+      rules.forEach(rule => {
+        rule.antecedent.forEach(item => {
+          itemFrequency.set(item, (itemFrequency.get(item) || 0) + rule.support);
+        });
+        rule.consequent.forEach(item => {
+          itemFrequency.set(item, (itemFrequency.get(item) || 0) + rule.support);
+        });
+      });
+
+      const fallbackRecommendations = Array.from(itemFrequency.entries())
+        .filter(([item]) => !cartItemSet.has(item))
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 5)
+        .map(([product, support]) => ({
+          product,
+          reason: ['Frequently purchased item'],
+          confidence: 0.5, // Default confidence for fallback
+          support
+        }));
+
+      console.log('🔄 Fallback recommendations:', fallbackRecommendations.length);
+      setRecommendations(fallbackRecommendations);
+    } else {
+      setRecommendations(recommendationsList);
+    }
+
+    setAppliedRules(rulesApplied);
+  }, [cart, rules]);
+
+  const addToCart = (product: Product) => {
+    const result = safeSync(() => {
+      setCart((prevCart) => {
+        const existingItem = prevCart.find((item) => item.id === product.id);
+        if (existingItem) {
+          return prevCart.map((item) =>
+            item.id === product.id
+              ? { ...item, quantity: item.quantity + 1 }
+              : item
+          );
+        }
+        return [...prevCart, { ...product, quantity: 1 }];
+      });
+    }, 'addToCart');
+
+    if (result.error) {
+      toast.error(getErrorMessage(result.error));
+      return;
+    }
+
+    toast.success(`${product.name} added to cart!`, {
+      description: "Check recommendations for related items",
+    });
+  };
+
+  const removeFromCart = (productId: number) => {
+    setCart((prevCart) => {
+      const existingItem = prevCart.find((item) => item.id === productId);
+      if (existingItem && existingItem.quantity > 1) {
+        return prevCart.map((item) =>
+          item.id === productId
+            ? { ...item, quantity: item.quantity - 1 }
+            : item
+        );
+      }
+      return prevCart.filter((item) => item.id !== productId);
+    });
+  };
+
+  const increaseQuantity = (productId: number) => {
+    setCart((prevCart) =>
+      prevCart.map((item) =>
+        item.id === productId
+          ? { ...item, quantity: item.quantity + 1 }
+          : item
+      )
+    );
+  };
+
+  const decreaseQuantity = (productId: number) => {
+    setCart((prevCart) => {
+      const existingItem = prevCart.find((item) => item.id === productId);
+      if (existingItem && existingItem.quantity > 1) {
+        return prevCart.map((item) =>
+          item.id === productId
+            ? { ...item, quantity: item.quantity - 1 }
+            : item
+        );
+      }
+      return prevCart.filter((item) => item.id !== productId);
+    });
+  };
+
+  const removeItem = (productId: number) => {
+    setCart((prevCart) => prevCart.filter((item) => item.id !== productId));
+  };
+
+  const clearCart = () => {
+    setCart([]);
+    toast.info("Cart cleared");
+  };
+
+  const handleCheckout = () => {
+    toast.success("Checkout functionality coming soon!", {
+      description: "This is a demo application"
+    });
+  };
+
+  const cartTotal = cart.reduce(
+    (sum, item) => sum + item.price * item.quantity,
+    0
+  );
+
+  const totalItems = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const avgConfidence = recommendations.length > 0
+    ? recommendations.reduce((sum, rec) => sum + rec.confidence, 0) / recommendations.length
+    : 0;
+
+  return (
+    <div className="min-h-screen bg-background">
+      {/* Header */}
+      <header className="border-b border-border bg-card sticky top-0 z-10 shadow-sm">
+        <div className="container mx-auto px-4 py-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Continue Shopping
+              </Button>
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">SmartMart</h1>
+                <p className="text-sm text-muted-foreground">
+                  Your Shopping Cart
+                </p>
+              </div>
+            </div>
+            <div className="flex items-center gap-4">
+              <Badge variant="secondary" className="gap-1">
+                <Package className="h-3 w-3" />
+                {totalItems} items
+              </Badge>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <div className="container mx-auto px-4 py-8">
+        {cart.length === 0 ? (
+          <div className="max-w-md mx-auto">
+            <EmptyCartState onStartShopping={() => navigate('/')} />
+          </div>
+        ) : (
+          <div className="grid lg:grid-cols-3 gap-8">
+            {/* Cart Items */}
+            <div className="lg:col-span-2 space-y-6">
+              <Card className="p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div className="flex items-center gap-2">
+                    <ShoppingCart className="h-6 w-6 text-primary" />
+                    <h2 className="text-2xl font-bold text-foreground">
+                      Shopping Cart ({totalItems} items)
+                    </h2>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={clearCart}
+                    className="text-destructive hover:text-destructive"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    Clear Cart
+                  </Button>
+                </div>
+
+                <div className="space-y-4">
+                  {cart.map((item) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center gap-6 p-4 rounded-lg bg-card border hover:shadow-md transition-all group"
+                    >
+                      <div className="text-4xl flex-shrink-0">{item.emoji}</div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-lg text-foreground mb-1">
+                          {item.name}
+                        </h3>
+                        <p className="text-sm text-muted-foreground mb-2">
+                          {item.category}
+                        </p>
+                        <p className="text-lg font-bold text-primary">
+                          ₹{item.price.toFixed(2)} each
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-4 flex-shrink-0">
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => decreaseQuantity(item.id)}
+                            className="h-10 w-10 p-0 touch-manipulation"
+                            disabled={item.quantity <= 1}
+                            aria-label={`Decrease quantity of ${item.name}`}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </Button>
+                          <span className="w-12 text-center font-semibold text-lg min-w-[3rem]">
+                            {item.quantity}
+                          </span>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => increaseQuantity(item.id)}
+                            className="h-10 w-10 p-0 touch-manipulation"
+                            aria-label={`Increase quantity of ${item.name}`}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-xl font-bold text-primary mb-2">
+                            ₹{(item.price * item.quantity).toFixed(2)}
+                          </p>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeItem(item.id)}
+                            className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity"
+                            aria-label={`Remove ${item.name} from cart`}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              {/* Recommendations */}
+              {recommendations.length > 0 && (
+                <Card className="p-6 border-recommendation-border bg-recommendation">
+                  <div className="flex items-center gap-2 mb-6">
+                    <Sparkles className="h-5 w-5 text-accent-foreground" />
+                    <h2 className="text-xl font-bold text-accent-foreground">
+                      Recommended for You
+                    </h2>
+                  </div>
+                  <p className="text-sm text-accent-foreground/80 mb-4">
+                    Based on items in your cart
+                  </p>
+                  <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {recommendations.slice(0, 6).map((rec, idx) => {
+                      const product = products.find((p) => p.name === rec.product);
+                      if (!product) return null;
+                      const isNew = newRecommendation === rec.product;
+                      return (
+                        <Card
+                          key={idx}
+                          className={`p-4 hover:shadow-md transition-all cursor-pointer border-recommendation-border ${
+                            isNew ? "animate-glow" : ""
+                          }`}
+                          onClick={() => navigate(`/product/${product.id}`)}
+                        >
+                          <div className="text-center mb-3">
+                            <div className="text-3xl mb-2">{product.emoji}</div>
+                            <Badge
+                              variant="secondary"
+                              className="text-xs bg-success/10 text-success border-success/20"
+                            >
+                              {(rec.confidence * 100).toFixed(0)}%
+                            </Badge>
+                          </div>
+                          <div className="text-center">
+                            <h4 className="font-semibold text-sm mb-1">{product.name}</h4>
+                            <p className="text-primary font-bold text-sm mb-3">
+                              ₹{product.price.toFixed(2)}
+                            </p>
+                            <Button
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                addToCart(product);
+                              }}
+                              className="w-full"
+                            >
+                              Add to Cart
+                            </Button>
+                          </div>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                </Card>
+              )}
+            </div>
+
+            {/* Cart Summary */}
+            <div className="space-y-6">
+              {/* Algorithm Insights */}
+              {appliedRules.length > 0 && (
+                <Card className="p-4 bg-gradient-to-br from-info/10 to-primary/5 border-info/20">
+                  <div className="flex items-center gap-2 mb-4">
+                    <TrendingUp className="h-5 w-5 text-info" />
+                    <h3 className="text-lg font-bold text-foreground">
+                      Smart Recommendations
+                    </h3>
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-muted-foreground">Active Rules</span>
+                        <span className="font-semibold">{appliedRules.length}</span>
+                      </div>
+                      <Progress value={(appliedRules.length / rules.length) * 100} className="h-2" />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-muted-foreground">Avg Confidence</span>
+                        <span className="font-semibold">{(avgConfidence * 100).toFixed(0)}%</span>
+                      </div>
+                      <Progress value={avgConfidence * 100} className="h-2" />
+                    </div>
+                  </div>
+                </Card>
+              )}
+
+              {/* Order Summary */}
+              <Card className="p-6">
+                <h3 className="text-xl font-bold text-foreground mb-6">Order Summary</h3>
+
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">
+                      Subtotal ({totalItems} items)
+                    </span>
+                    <span className="font-medium">₹{cartTotal.toFixed(2)}</span>
+                  </div>
+
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Shipping</span>
+                    <span className="font-medium text-green-600">FREE</span>
+                  </div>
+
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Tax</span>
+                    <span className="font-medium">₹{(cartTotal * 0.18).toFixed(2)}</span>
+                  </div>
+
+                  <Separator />
+
+                  <div className="flex justify-between items-center">
+                    <span className="text-lg font-semibold text-foreground">Total</span>
+                    <span className="text-3xl font-bold text-primary">
+                      ₹{(cartTotal * 1.18).toFixed(2)}
+                    </span>
+                  </div>
+
+                  <Button
+                    className="w-full bg-primary hover:bg-primary/90 transition-colors text-lg py-6"
+                    size="lg"
+                    onClick={handleCheckout}
+                  >
+                    <ShoppingCart className="h-5 w-5 mr-2" />
+                    Proceed to Checkout
+                  </Button>
+
+                  {/* Features */}
+                  <div className="grid grid-cols-3 gap-4 pt-4 border-t">
+                    <div className="text-center">
+                      <Truck className="h-6 w-6 mx-auto mb-2 text-green-600" />
+                      <p className="text-xs font-medium">Free Delivery</p>
+                      <p className="text-xs text-muted-foreground">On orders over ₹500</p>
+                    </div>
+                    <div className="text-center">
+                      <Shield className="h-6 w-6 mx-auto mb-2 text-blue-600" />
+                      <p className="text-xs font-medium">Secure Payment</p>
+                      <p className="text-xs text-muted-foreground">100% protected</p>
+                    </div>
+                    <div className="text-center">
+                      <RotateCcw className="h-6 w-6 mx-auto mb-2 text-orange-600" />
+                      <p className="text-xs font-medium">Easy Returns</p>
+                      <p className="text-xs text-muted-foreground">30-day policy</p>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          </div>
+        )}
+
+        {/* Empty state when cart has items but no recommendations */}
+        {cart.length > 0 && recommendations.length === 0 && !isLoadingRules && (
+          <NoRecommendationsState />
+        )}
+      </div>
+
+      <Footer />
+    </div>
+  );
+};
+
+export default Cart;
