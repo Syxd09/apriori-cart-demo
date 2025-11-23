@@ -19,8 +19,8 @@ This is a 5-minute classroom presentation demo that showcases how association ru
 
 ## 🚀 How to Run
 
-### Option 1: Using Lovable (Recommended)
-1. Open the project in [Lovable](https://lovable.dev)
+### Option 1: 
+
 2. The app runs automatically in the preview window
 
 ### Option 2: Local Development
