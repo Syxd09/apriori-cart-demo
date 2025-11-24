@@ -16,71 +16,29 @@ import {
   Package,
   Truck,
   Shield,
-  RotateCcw
+  RotateCcw,
+  Heart
 } from "lucide-react";
 import { toast } from "sonner";
-import { runAprioriAlgorithm, sampleTransactions, PRODUCT_CATALOG } from "@/lib/apriori";
+import { runAprioriAlgorithm, sampleTransactions } from "@/lib/apriori";
+import { PRODUCT_CATALOG } from "@/lib/data";
 import { NotFoundErrorState, EmptyCartState } from "@/components/ErrorState";
 import Footer from "@/components/Footer";
 import type {
   Product,
   CartItem,
+  WishlistItem,
   AprioriRule,
   Recommendation
 } from "@/types";
 
-// Generate comprehensive product catalog from apriori data
-const generateProductsFromCatalog = (): Product[] => {
-  const products: Product[] = [];
-  let id = 1;
-
-  // Emoji mappings for categories
-  const categoryEmojis: Record<string, string> = {
-    fruits: '🍎', vegetables: '🥕', dairy: '🥛', meat: '🥩', bakery: '🍞',
-    grains: '🌾', canned: '🥫', condiments: '🧂', beverages: '🥤', alcohol: '🍷',
-    snacks: '🍿', sweets: '🍪', frozen: '🧊', health: '💊', household: '🧺',
-    personal: '🧴', baby: '👶', pet: '🐕'
-  };
-
-  // Price ranges for categories (in INR)
-  const priceRanges: Record<string, [number, number]> = {
-    fruits: [40, 200], vegetables: [25, 150], dairy: [50, 300], meat: [150, 600],
-    bakery: [30, 500], grains: [50, 150], canned: [40, 120], condiments: [30, 400],
-    beverages: [20, 150], alcohol: [200, 800], snacks: [20, 150], sweets: [50, 300],
-    frozen: [100, 400], health: [100, 500], household: [50, 300], personal: [80, 400],
-    baby: [100, 600], pet: [150, 800]
-  };
-
-  Object.entries(PRODUCT_CATALOG).forEach(([category, items]) => {
-    const emoji = categoryEmojis[category] || '📦';
-    const [minPrice, maxPrice] = priceRanges[category] || [50, 200];
-    const categoryName = category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-
-    items.forEach((itemName: string) => {
-      // Generate realistic price within range
-      const price = Math.round((minPrice + Math.random() * (maxPrice - minPrice)) / 5) * 5; // Round to nearest 5
-
-      products.push({
-        id,
-        name: itemName,
-        price,
-        emoji,
-        category: categoryName,
-        inStock: true
-      });
-      id++;
-    });
-  });
-
-  return products;
-};
-
-const products: Product[] = generateProductsFromCatalog();
+const products: Product[] = PRODUCT_CATALOG;
 
 const ProductDetail = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [cart, setCart] = useState<CartItem[]>([]);
+  const [wishlist, setWishlist] = useState<WishlistItem[]>([]);
   const [rules, setRules] = useState<AprioriRule[]>([]);
   const [recommendations, setRecommendations] = useState<Recommendation[]>([]);
   const [quantity, setQuantity] = useState(1);
@@ -96,6 +54,16 @@ const ProductDetail = () => {
         setCart(JSON.parse(savedCart));
       } catch (error) {
         console.error('Error loading cart from localStorage:', error);
+      }
+    }
+
+    // Load wishlist from localStorage
+    const savedWishlist = localStorage.getItem('smartmart-wishlist');
+    if (savedWishlist) {
+      try {
+        setWishlist(JSON.parse(savedWishlist));
+      } catch (error) {
+        console.error('Error loading wishlist from localStorage:', error);
       }
     }
 
@@ -172,6 +140,11 @@ const ProductDetail = () => {
     // Save cart to localStorage whenever it changes
     localStorage.setItem('smartmart-cart', JSON.stringify(cart));
   }, [cart]);
+
+  useEffect(() => {
+    // Save wishlist to localStorage whenever it changes
+    localStorage.setItem('smartmart-wishlist', JSON.stringify(wishlist));
+  }, [wishlist]);
 
   useEffect(() => {
     // Generate enhanced recommendations based on cart and current product
@@ -383,6 +356,17 @@ const ProductDetail = () => {
 
   const cartItem = cart.find(item => item.id === product.id);
   const isInCart = !!cartItem;
+  const isInWishlist = wishlist.some(item => item.id === product.id);
+
+  const toggleWishlist = () => {
+    if (isInWishlist) {
+      setWishlist(prev => prev.filter(item => item.id !== product.id));
+      toast.success(`${product.name} removed from wishlist!`);
+    } else {
+      setWishlist(prev => [...prev, { ...product, addedAt: new Date() }]);
+      toast.success(`${product.name} added to wishlist!`);
+    }
+  };
 
   const shareProduct = async (platform: string) => {
     const productUrl = window.location.href;
@@ -500,49 +484,92 @@ const ProductDetail = () => {
 
             {/* Product Info */}
             <Card className="p-8">
-              <div className="grid md:grid-cols-2 gap-8">
+              <div className="grid lg:grid-cols-2 gap-8">
                 {/* Product Image Gallery */}
                 <div className="space-y-4">
-                  <div className="text-center">
-                    <div className="text-9xl mb-4 bg-gradient-to-br from-primary/10 to-accent/10 rounded-2xl p-8 border-2 border-primary/20">
-                      {product.emoji}
-                    </div>
-                    <Badge variant="secondary" className="text-lg px-4 py-2">
-                      {product.category}
-                    </Badge>
+                  <div className="aspect-square bg-gradient-to-br from-primary/10 to-accent/10 rounded-2xl p-8 border-2 border-primary/20 flex items-center justify-center">
+                    <div className="text-9xl">{product.emoji}</div>
                   </div>
-                  {/* Image Thumbnails (mock) */}
+                  <Badge variant="secondary" className="text-lg px-4 py-2 block text-center">
+                    {product.category}
+                  </Badge>
+                  {/* Image Gallery Thumbnails */}
                   <div className="flex justify-center gap-2">
-                    <button className="w-16 h-16 rounded-lg border-2 border-primary bg-gradient-to-br from-primary/10 to-accent/10 flex items-center justify-center text-2xl">
-                      {product.emoji}
-                    </button>
-                    <button className="w-16 h-16 rounded-lg border border-muted flex items-center justify-center text-2xl opacity-50">
-                      📦
-                    </button>
-                    <button className="w-16 h-16 rounded-lg border border-muted flex items-center justify-center text-2xl opacity-50">
-                      🏷️
-                    </button>
+                    {product.imageUrls.map((url, idx) => (
+                      <button
+                        key={idx}
+                        className={`w-16 h-16 rounded-lg border-2 flex items-center justify-center text-2xl ${
+                          idx === 0 ? 'border-primary' : 'border-muted opacity-50'
+                        }`}
+                        aria-label={`View image ${idx + 1}`}
+                      >
+                        {product.emoji}
+                      </button>
+                    ))}
                   </div>
                 </div>
 
                 {/* Product Details */}
                 <div className="space-y-6">
                   <div>
-                    <h1 className="text-3xl font-bold text-foreground mb-2">
-                      {product.name}
-                    </h1>
+                    <div className="flex items-start justify-between mb-2">
+                      <h1 className="text-3xl font-bold text-foreground">
+                        {product.name}
+                      </h1>
+                      <Badge variant="outline" className="ml-4">
+                        {product.brand}
+                      </Badge>
+                    </div>
                     <div className="flex items-center gap-2 mb-4">
                       <div className="flex">
                         {[...Array(5)].map((_, i) => (
-                          <Star key={i} className="h-4 w-4 fill-yellow-400 text-yellow-400" />
+                          <Star
+                            key={i}
+                            className={`h-4 w-4 ${
+                              i < Math.floor(product.rating)
+                                ? 'fill-yellow-400 text-yellow-400'
+                                : i < product.rating
+                                ? 'fill-yellow-400/50 text-yellow-400'
+                                : 'text-muted-foreground'
+                            }`}
+                          />
                         ))}
                       </div>
-                      <span className="text-sm text-muted-foreground">(4.5) • 128 reviews</span>
+                      <span className="text-sm text-muted-foreground">
+                        ({product.rating}) • {product.reviewCount} reviews
+                      </span>
+                    </div>
+                    {/* Availability Status */}
+                    <div className="flex items-center gap-2 mb-4">
+                      <Package className="h-4 w-4" />
+                      <Badge
+                        variant={
+                          product.availability === 'in_stock'
+                            ? 'default'
+                            : product.availability === 'limited'
+                            ? 'secondary'
+                            : 'destructive'
+                        }
+                      >
+                        {product.availability === 'in_stock'
+                          ? 'In Stock'
+                          : product.availability === 'limited'
+                          ? 'Limited Stock'
+                          : 'Out of Stock'}
+                      </Badge>
                     </div>
                   </div>
 
                   <div className="text-4xl font-bold text-primary">
                     ₹{product.price.toFixed(2)}
+                  </div>
+
+                  {/* Product Description */}
+                  <div className="space-y-2">
+                    <h3 className="font-semibold text-foreground">Description</h3>
+                    <p className="text-muted-foreground leading-relaxed">
+                      {product.description}
+                    </p>
                   </div>
 
                   {/* Quantity Selector */}
@@ -555,29 +582,50 @@ const ProductDetail = () => {
                           size="sm"
                           onClick={() => setQuantity(Math.max(1, quantity - 1))}
                           disabled={quantity <= 1}
+                          aria-label="Decrease quantity"
                         >
                           <Minus className="h-4 w-4" />
                         </Button>
-                        <span className="w-12 text-center font-semibold">{quantity}</span>
+                        <span className="w-12 text-center font-semibold" aria-label={`Quantity: ${quantity}`}>
+                          {quantity}
+                        </span>
                         <Button
                           variant="outline"
                           size="sm"
                           onClick={() => setQuantity(quantity + 1)}
+                          disabled={product.availability === 'out_of_stock'}
+                          aria-label="Increase quantity"
                         >
                           <Plus className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
 
-                    {/* Add to Cart Button */}
-                    <Button
-                      size="lg"
-                      className="w-full text-lg py-6"
-                      onClick={() => addToCart(product, quantity)}
-                    >
-                      <ShoppingCart className="h-5 w-5 mr-2" />
-                      {isInCart ? `Add ${quantity} More to Cart` : `Add ${quantity} to Cart`}
-                    </Button>
+                    {/* Action Buttons */}
+                    <div className="flex gap-3">
+                      <Button
+                        size="lg"
+                        className="flex-1 text-lg py-6"
+                        onClick={() => addToCart(product, quantity)}
+                        disabled={product.availability === 'out_of_stock'}
+                      >
+                        <ShoppingCart className="h-5 w-5 mr-2" />
+                        {product.availability === 'out_of_stock'
+                          ? 'Out of Stock'
+                          : isInCart
+                          ? `Add ${quantity} More`
+                          : `Add ${quantity} to Cart`}
+                      </Button>
+                      <Button
+                        size="lg"
+                        variant={isInWishlist ? "default" : "outline"}
+                        onClick={toggleWishlist}
+                        className="px-6"
+                        aria-label={isInWishlist ? "Remove from wishlist" : "Add to wishlist"}
+                      >
+                        <Heart className={`h-5 w-5 ${isInWishlist ? 'fill-current' : ''}`} />
+                      </Button>
+                    </div>
 
                     {isInCart && (
                       <p className="text-sm text-muted-foreground text-center">
@@ -610,37 +658,86 @@ const ProductDetail = () => {
 
             {/* Product Specifications */}
             <Card className="p-6">
-              <h3 className="text-xl font-bold text-foreground mb-4">Product Details</h3>
+              <h3 className="text-xl font-bold text-foreground mb-4">Product Specifications</h3>
               <div className="grid md:grid-cols-2 gap-6">
                 <div className="space-y-3">
                   <div className="flex justify-between py-2 border-b border-border">
+                    <span className="text-muted-foreground">Brand</span>
+                    <span className="font-medium">{product.brand}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-border">
                     <span className="text-muted-foreground">Category</span>
                     <span className="font-medium">{product.category}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-border">
+                    <span className="text-muted-foreground">SKU</span>
+                    <span className="font-medium font-mono text-sm">{product.sku}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-border">
                     <span className="text-muted-foreground">Price</span>
                     <span className="font-medium text-primary">₹{product.price.toFixed(2)}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-border">
-                    <span className="text-muted-foreground">In Stock</span>
-                    <Badge variant={product.inStock ? "default" : "destructive"}>
-                      {product.inStock ? "Available" : "Out of Stock"}
+                    <span className="text-muted-foreground">Availability</span>
+                    <Badge variant={
+                      product.availability === 'in_stock' ? "default" :
+                      product.availability === 'limited' ? "secondary" : "destructive"
+                    }>
+                      {product.availability === 'in_stock' ? "In Stock" :
+                       product.availability === 'limited' ? "Limited Stock" : "Out of Stock"}
                     </Badge>
                   </div>
                 </div>
                 <div className="space-y-3">
                   <div className="flex justify-between py-2 border-b border-border">
-                    <span className="text-muted-foreground">SKU</span>
-                    <span className="font-medium">SM-{product.id.toString().padStart(4, '0')}</span>
+                    <span className="text-muted-foreground">Weight</span>
+                    <span className="font-medium">{product.weight.value}{product.weight.unit}</span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-border">
-                    <span className="text-muted-foreground">Weight</span>
-                    <span className="font-medium">500g</span>
+                    <span className="text-muted-foreground">Dimensions</span>
+                    <span className="font-medium text-sm">
+                      {product.dimensions.length} × {product.dimensions.width} × {product.dimensions.height} {product.dimensions.unit}
+                    </span>
                   </div>
                   <div className="flex justify-between py-2 border-b border-border">
                     <span className="text-muted-foreground">Origin</span>
-                    <span className="font-medium">India</span>
+                    <span className="font-medium">{product.specifications.Origin || 'India'}</span>
                   </div>
+                  <div className="flex justify-between py-2 border-b border-border">
+                    <span className="text-muted-foreground">Storage</span>
+                    <span className="font-medium">{product.specifications.Storage || 'Cool, dry place'}</span>
+                  </div>
+                  <div className="flex justify-between py-2 border-b border-border">
+                    <span className="text-muted-foreground">Shelf Life</span>
+                    <span className="font-medium">{product.specifications['Shelf Life'] || '12 months'}</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Additional Specifications */}
+              <div className="mt-6 pt-6 border-t border-border">
+                <h4 className="font-semibold text-foreground mb-3">Additional Details</h4>
+                <div className="grid md:grid-cols-2 gap-4">
+                  {Object.entries(product.specifications).map(([key, value]) => (
+                    key !== 'Origin' && key !== 'Storage' && key !== 'Shelf Life' && (
+                      <div key={key} className="flex justify-between py-1">
+                        <span className="text-muted-foreground text-sm">{key}</span>
+                        <span className="font-medium text-sm">{value}</span>
+                      </div>
+                    )
+                  ))}
+                </div>
+              </div>
+
+              {/* Tags */}
+              <div className="mt-6 pt-6 border-t border-border">
+                <h4 className="font-semibold text-foreground mb-3">Tags</h4>
+                <div className="flex flex-wrap gap-2">
+                  {product.tags.map((tag, idx) => (
+                    <Badge key={idx} variant="outline" className="text-xs">
+                      {tag}
+                    </Badge>
+                  ))}
                 </div>
               </div>
             </Card>
@@ -654,57 +751,100 @@ const ProductDetail = () => {
                 </Button>
               </div>
 
-              {/* Overall Rating */}
-              <div className="flex items-center gap-4 mb-6 p-4 bg-muted/50 rounded-lg">
+              {/* Overall Rating Summary */}
+              <div className="flex flex-col lg:flex-row items-start lg:items-center gap-6 mb-6 p-4 bg-muted/50 rounded-lg">
                 <div className="text-center">
-                  <div className="text-3xl font-bold text-primary">4.5</div>
-                  <div className="flex justify-center mb-1">
+                  <div className="text-4xl font-bold text-primary mb-2">{product.rating.toFixed(1)}</div>
+                  <div className="flex justify-center mb-2">
                     {[...Array(5)].map((_, i) => (
-                      <Star key={i} className={`h-4 w-4 ${i < 4 ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
+                      <Star key={i} className={`h-5 w-5 ${i < Math.floor(product.rating) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
                     ))}
                   </div>
-                  <div className="text-sm text-muted-foreground">128 reviews</div>
+                  <div className="text-sm text-muted-foreground">{product.reviewCount} reviews</div>
                 </div>
-                <Separator orientation="vertical" className="h-16" />
-                <div className="flex-1 space-y-2">
-                  {[5, 4, 3, 2, 1].map((rating) => (
-                    <div key={rating} className="flex items-center gap-2 text-sm">
-                      <span className="w-8">{rating}★</span>
-                      <Progress value={rating === 5 ? 60 : rating === 4 ? 25 : rating === 3 ? 10 : 3} className="flex-1 h-2" />
-                      <span className="w-8 text-muted-foreground">
-                        {rating === 5 ? 77 : rating === 4 ? 32 : rating === 3 ? 13 : rating === 2 ? 4 : 2}
-                      </span>
-                    </div>
-                  ))}
+                <Separator orientation="vertical" className="hidden lg:block h-20" />
+                <div className="flex-1 w-full lg:w-auto">
+                  <div className="space-y-2">
+                    {[5, 4, 3, 2, 1].map((rating) => {
+                      const count = Math.round((product.reviewCount * (rating === 5 ? 0.6 : rating === 4 ? 0.25 : rating === 3 ? 0.1 : rating === 2 ? 0.03 : 0.02)));
+                      const percentage = (count / product.reviewCount) * 100;
+                      return (
+                        <div key={rating} className="flex items-center gap-3 text-sm">
+                          <span className="w-6 text-center">{rating}★</span>
+                          <Progress value={percentage} className="flex-1 h-2" />
+                          <span className="w-8 text-muted-foreground text-right">{count}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+
+              {/* Review Filters and Sorting */}
+              <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                <div className="flex-1">
+                  <select className="w-full px-3 py-2 border border-border rounded-md text-sm bg-background">
+                    <option value="newest">Newest First</option>
+                    <option value="oldest">Oldest First</option>
+                    <option value="highest">Highest Rated</option>
+                    <option value="lowest">Lowest Rated</option>
+                    <option value="helpful">Most Helpful</option>
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="outline" size="sm">All Stars</Button>
+                  <Button variant="outline" size="sm">5 Stars</Button>
+                  <Button variant="outline" size="sm">4 Stars</Button>
+                  <Button variant="outline" size="sm">3 Stars</Button>
+                  <Button variant="outline" size="sm">2 Stars</Button>
+                  <Button variant="outline" size="sm">1 Star</Button>
                 </div>
               </div>
 
               {/* Individual Reviews */}
-              <div className="space-y-4">
+              <div className="space-y-6">
                 {[
-                  { name: "Rajesh Kumar", rating: 5, date: "2 days ago", comment: "Excellent quality product! Exactly as described. Fast delivery and great packaging." },
-                  { name: "Priya Sharma", rating: 4, date: "1 week ago", comment: "Good product overall. Minor issues with packaging but the item itself is perfect." },
-                  { name: "Amit Patel", rating: 5, date: "2 weeks ago", comment: "Highly recommend! Will definitely buy again. Great value for money." }
+                  { name: "Rajesh Kumar", rating: 5, date: "2 days ago", verified: true, helpful: 12, comment: "Excellent quality product! Exactly as described. Fast delivery and great packaging. The " + product.category.toLowerCase() + " exceeded my expectations in terms of freshness and taste." },
+                  { name: "Priya Sharma", rating: 4, date: "1 week ago", verified: true, helpful: 8, comment: "Good product overall. Minor issues with packaging but the item itself is perfect. The " + product.name.toLowerCase() + " from " + product.brand + " is exactly what I was looking for." },
+                  { name: "Amit Patel", rating: 5, date: "2 weeks ago", verified: false, helpful: 15, comment: "Highly recommend! Will definitely buy again. Great value for money. The quality and freshness of this " + product.category.toLowerCase() + " is outstanding." },
+                  { name: "Sneha Gupta", rating: 4, date: "3 weeks ago", verified: true, helpful: 6, comment: "Very satisfied with the purchase. The " + product.name.toLowerCase() + " arrived in perfect condition and the taste is amazing. Would recommend to friends and family." },
+                  { name: "Vikram Singh", rating: 3, date: "1 month ago", verified: true, helpful: 4, comment: "Decent product. Met my expectations but nothing extraordinary. The packaging could be better but the quality of the " + product.category.toLowerCase() + " itself is good." },
+                  { name: "Kavita Reddy", rating: 5, date: "6 weeks ago", verified: false, helpful: 9, comment: "Absolutely love this! The best " + product.category.toLowerCase() + " I've tried. Fresh, flavorful, and excellent value. " + product.brand + " never disappoints." }
                 ].map((review, idx) => (
-                  <div key={idx} className="border-b border-border pb-4 last:border-b-0">
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-2">
-                        <span className="font-medium">{review.name}</span>
-                        <div className="flex">
-                          {[...Array(5)].map((_, i) => (
-                            <Star key={i} className={`h-3 w-3 ${i < review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
-                          ))}
+                  <div key={idx} className="border-b border-border pb-6 last:border-b-0">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-primary/10 rounded-full flex items-center justify-center text-sm font-medium">
+                          {review.name.split(' ').map(n => n[0]).join('')}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-medium">{review.name}</span>
+                            {review.verified && (
+                              <Badge variant="secondary" className="text-xs">Verified Purchase</Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1">
+                            <div className="flex">
+                              {[...Array(5)].map((_, i) => (
+                                <Star key={i} className={`h-3 w-3 ${i < review.rating ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground'}`} />
+                              ))}
+                            </div>
+                            <span className="text-sm text-muted-foreground">{review.date}</span>
+                          </div>
                         </div>
                       </div>
-                      <span className="text-sm text-muted-foreground">{review.date}</span>
+                      <Button variant="ghost" size="sm" className="text-muted-foreground hover:text-foreground">
+                        👍 Helpful ({review.helpful})
+                      </Button>
                     </div>
-                    <p className="text-sm text-muted-foreground">{review.comment}</p>
+                    <p className="text-sm text-muted-foreground leading-relaxed">{review.comment}</p>
                   </div>
                 ))}
               </div>
 
-              <div className="text-center mt-4">
-                <Button variant="outline">View All Reviews</Button>
+              <div className="text-center mt-6">
+                <Button variant="outline">Load More Reviews</Button>
               </div>
             </Card>
 
@@ -836,7 +976,7 @@ const ProductDetail = () => {
                   </h2>
                 </div>
                 <p className="text-sm text-accent-foreground/80 mb-4">
-                  Personalized recommendations based on your shopping patterns
+                  Personalized recommendations powered by Apriori algorithm analysis
                 </p>
                 <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {recommendations.map((rec, idx) => {
@@ -866,9 +1006,24 @@ const ProductDetail = () => {
                           <p className="text-primary font-bold text-sm">
                             ₹{recProduct.price.toFixed(2)}
                           </p>
+                          <div className="flex items-center justify-center gap-1 mt-1">
+                            {[...Array(5)].map((_, i) => (
+                              <Star
+                                key={i}
+                                className={`h-3 w-3 ${
+                                  i < Math.floor(recProduct.rating)
+                                    ? 'fill-yellow-400 text-yellow-400'
+                                    : 'text-muted-foreground'
+                                }`}
+                              />
+                            ))}
+                            <span className="text-xs text-muted-foreground ml-1">
+                              ({recProduct.rating})
+                            </span>
+                          </div>
                         </div>
                         <div className="text-xs text-accent-foreground/70 space-y-1">
-                          <div className="font-medium">Why recommended:</div>
+                          <div className="font-medium mb-2">Why recommended:</div>
                           {rec.reason.slice(0, 2).map((reason, rIdx) => (
                             <div key={rIdx} className="truncate" title={reason}>
                               • {reason}
@@ -880,12 +1035,127 @@ const ProductDetail = () => {
                             </div>
                           )}
                         </div>
+                        <div className="mt-3 pt-3 border-t border-accent-foreground/20">
+                          <div className="grid grid-cols-3 gap-1 text-xs text-accent-foreground/60">
+                            <div className="text-center">
+                              <div className="font-medium">{(rec.support * 100).toFixed(1)}%</div>
+                              <div>Support</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="font-medium">{(rec.lift || 1).toFixed(1)}x</div>
+                              <div>Lift</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="font-medium">{rec.ruleCount}</div>
+                              <div>Rules</div>
+                            </div>
+                          </div>
+                        </div>
                       </Card>
                     );
                   })}
                 </div>
               </Card>
             )}
+
+            {/* Algorithm Insights */}
+            <Card className="p-6">
+              <h3 className="text-xl font-bold text-foreground mb-4 flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-primary" />
+                Apriori Algorithm Insights
+              </h3>
+
+              <div className="space-y-6">
+                <div className="bg-muted/50 p-4 rounded-lg">
+                  <h4 className="font-semibold text-foreground mb-2">How Recommendations Work</h4>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    Our recommendation system uses the Apriori algorithm to analyze shopping patterns from {sampleTransactions.length.toLocaleString()} transactions.
+                    When customers buy this {product.category.toLowerCase()}, they often purchase related items based on historical data.
+                  </p>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6">
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-3">Algorithm Metrics</h4>
+                    <div className="space-y-3">
+                      <div className="flex justify-between items-center py-2 border-b border-border">
+                        <span className="text-muted-foreground">Total Transactions</span>
+                        <span className="font-medium">{sampleTransactions.length.toLocaleString()}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-2 border-b border-border">
+                        <span className="text-muted-foreground">Association Rules</span>
+                        <span className="font-medium">{rules.length}</span>
+                      </div>
+                      <div className="flex justify-between items-center py-2 border-b border-border">
+                        <span className="text-muted-foreground">Min Support</span>
+                        <span className="font-medium">1.0%</span>
+                      </div>
+                      <div className="flex justify-between items-center py-2 border-b border-border">
+                        <span className="text-muted-foreground">Min Confidence</span>
+                        <span className="font-medium">20.0%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-3">Recommendation Logic</h4>
+                    <div className="space-y-3 text-sm text-muted-foreground">
+                      <div className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
+                        <p>Find rules where current product appears in the antecedent (left side)</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
+                        <p>Extract consequent items (right side) as potential recommendations</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
+                        <p>Rank by confidence, lift, and support metrics</p>
+                      </div>
+                      <div className="flex items-start gap-2">
+                        <div className="w-2 h-2 bg-primary rounded-full mt-2 flex-shrink-0"></div>
+                        <p>Filter out items already in cart for personalized results</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {recommendations.length > 0 && (
+                  <div>
+                    <h4 className="font-semibold text-foreground mb-3">Active Rules for This Product</h4>
+                    <div className="space-y-3">
+                      {recommendations.slice(0, 3).map((rec, idx) => {
+                        const recProduct = products.find((p) => p.name === rec.product);
+                        return (
+                          <div key={idx} className="bg-accent/10 p-3 rounded border">
+                            <div className="flex items-center justify-between mb-2">
+                              <span className="font-medium text-sm">{recProduct?.name}</span>
+                              <Badge variant="outline" className="text-xs">
+                                {(rec.confidence * 100).toFixed(0)}% confidence
+                              </Badge>
+                            </div>
+                            <div className="grid grid-cols-3 gap-4 text-xs text-muted-foreground">
+                              <div>
+                                <div className="font-medium text-foreground">{(rec.support * 100).toFixed(1)}%</div>
+                                <div>Support</div>
+                              </div>
+                              <div>
+                                <div className="font-medium text-foreground">{(rec.lift || 1).toFixed(1)}x</div>
+                                <div>Lift</div>
+                              </div>
+                              <div>
+                                <div className="font-medium text-foreground">{rec.ruleCount}</div>
+                                <div>Rules</div>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </Card>
           </div>
 
         </div>

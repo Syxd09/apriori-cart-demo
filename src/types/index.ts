@@ -5,11 +5,26 @@ export interface Product {
   price: number;
   emoji: string;
   category: string;
-  description?: string;
-  rating?: number;
-  reviewCount?: number;
-  inStock?: boolean;
-  tags?: string[];
+  brand: string;
+  description: string;
+  specifications: Record<string, string>;
+  dimensions: {
+    length: number;
+    width: number;
+    height: number;
+    unit: 'cm' | 'in';
+  };
+  weight: {
+    value: number;
+    unit: 'g' | 'kg' | 'lb' | 'oz';
+  };
+  imageUrls: string[];
+  rating: number;
+  reviewCount: number;
+  inStock: boolean;
+  tags: string[];
+  sku: string;
+  availability: 'in_stock' | 'out_of_stock' | 'limited';
 }
 
 export interface CartItem extends Product {
@@ -53,6 +68,8 @@ export interface Recommendation {
   diversity?: number; // For diversity scoring
   recency?: number; // For recency scoring
   popularity?: number; // For popularity scoring
+  lift?: number; // Lift metric from association rules
+  ruleCount?: number; // Number of rules supporting this recommendation
 }
 
 export interface AlgorithmStats {

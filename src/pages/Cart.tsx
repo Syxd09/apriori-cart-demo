@@ -19,10 +19,12 @@ import {
   RotateCcw
 } from "lucide-react";
 import { toast } from "sonner";
-import { runAprioriAlgorithm, sampleTransactions, PRODUCT_CATALOG } from "@/lib/apriori";
+import { runAprioriAlgorithm, sampleTransactions } from "@/lib/apriori";
+import { PRODUCT_CATALOG } from "@/lib/data";
 import { safeSync, SmartMartError, ERROR_CODES, getErrorMessage } from "@/lib/errorHandler";
 import { EmptyCartState, NoRecommendationsState } from "@/components/ErrorState";
 import Footer from "@/components/Footer";
+import RecommendationCard from "@/components/RecommendationCard";
 import type {
   Product,
   CartItem,
@@ -31,53 +33,8 @@ import type {
   AlgorithmStats
 } from "@/types";
 
-// Generate comprehensive product catalog from apriori data
-const generateProductsFromCatalog = (): Product[] => {
-  const products: Product[] = [];
-  let id = 1;
-
-  // Emoji mappings for categories
-  const categoryEmojis: Record<string, string> = {
-    fruits: '🍎', vegetables: '🥕', dairy: '🥛', meat: '🥩', bakery: '🍞',
-    grains: '🌾', canned: '🥫', condiments: '🧂', beverages: '🥤', alcohol: '🍷',
-    snacks: '🍿', sweets: '🍪', frozen: '🧊', health: '💊', household: '🧺',
-    personal: '🧴', baby: '👶', pet: '🐕'
-  };
-
-  // Price ranges for categories (in INR)
-  const priceRanges: Record<string, [number, number]> = {
-    fruits: [40, 200], vegetables: [25, 150], dairy: [50, 300], meat: [150, 600],
-    bakery: [30, 500], grains: [50, 150], canned: [40, 120], condiments: [30, 400],
-    beverages: [20, 150], alcohol: [200, 800], snacks: [20, 150], sweets: [50, 300],
-    frozen: [100, 400], health: [100, 500], household: [50, 300], personal: [80, 400],
-    baby: [100, 600], pet: [150, 800]
-  };
-
-  Object.entries(PRODUCT_CATALOG).forEach(([category, items]) => {
-    const emoji = categoryEmojis[category] || '📦';
-    const [minPrice, maxPrice] = priceRanges[category] || [50, 200];
-    const categoryName = category.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
-
-    items.forEach((itemName: string) => {
-      // Generate realistic price within range
-      const price = Math.round((minPrice + Math.random() * (maxPrice - minPrice)) / 5) * 5; // Round to nearest 5
-
-      products.push({
-        id,
-        name: itemName,
-        price,
-        emoji,
-        category: categoryName,
-        inStock: true
-      });
-      id++;
-    });
-  });
-
-  return products;
-};
-
-const products: Product[] = generateProductsFromCatalog();
+// Use the comprehensive product catalog directly
+const products: Product[] = PRODUCT_CATALOG;
 
 const Cart = () => {
   const navigate = useNavigate();
@@ -460,7 +417,7 @@ const Cart = () => {
                   {cart.map((item) => (
                     <div
                       key={item.id}
-                      className="flex items-center gap-6 p-4 rounded-lg bg-card border hover:shadow-md transition-all group"
+                      className="flex flex-col sm:flex-row items-start sm:items-center gap-4 sm:gap-6 p-4 rounded-lg bg-card border hover:shadow-md transition-all group"
                     >
                       <div className="text-4xl flex-shrink-0">{item.emoji}</div>
                       <div className="flex-1 min-w-0">
@@ -474,7 +431,7 @@ const Cart = () => {
                           ₹{item.price.toFixed(2)} each
                         </p>
                       </div>
-                      <div className="flex items-center gap-4 flex-shrink-0">
+                      <div className="flex items-center justify-between w-full sm:w-auto gap-4 flex-shrink-0 mt-2 sm:mt-0">
                         <div className="flex items-center gap-2">
                           <Button
                             variant="outline"
@@ -536,40 +493,21 @@ const Cart = () => {
                       const product = products.find((p) => p.name === rec.product);
                       if (!product) return null;
                       const isNew = newRecommendation === rec.product;
+                      // Find the corresponding rule for this recommendation
+                      const rule = appliedRules.find(r =>
+                        r.consequent.includes(rec.product) &&
+                        r.antecedent.every(ant => rec.reason.some(reason => reason.includes(ant)))
+                      );
                       return (
-                        <Card
+                        <RecommendationCard
                           key={idx}
-                          className={`p-4 hover:shadow-md transition-all cursor-pointer border-recommendation-border ${
-                            isNew ? "animate-glow" : ""
-                          }`}
-                          onClick={() => navigate(`/product/${product.id}`)}
-                        >
-                          <div className="text-center mb-3">
-                            <div className="text-3xl mb-2">{product.emoji}</div>
-                            <Badge
-                              variant="secondary"
-                              className="text-xs bg-success/10 text-success border-success/20"
-                            >
-                              {(rec.confidence * 100).toFixed(0)}%
-                            </Badge>
-                          </div>
-                          <div className="text-center">
-                            <h4 className="font-semibold text-sm mb-1">{product.name}</h4>
-                            <p className="text-primary font-bold text-sm mb-3">
-                              ₹{product.price.toFixed(2)}
-                            </p>
-                            <Button
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                addToCart(product);
-                              }}
-                              className="w-full"
-                            >
-                              Add to Cart
-                            </Button>
-                          </div>
-                        </Card>
+                          recommendation={rec}
+                          product={product}
+                          rule={rule}
+                          onAddToCart={addToCart}
+                          onViewDetails={() => navigate(`/product/${product.id}`)}
+                          className={isNew ? "animate-glow" : ""}
+                        />
                       );
                     })}
                   </div>

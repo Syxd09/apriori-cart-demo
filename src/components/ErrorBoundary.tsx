@@ -1,7 +1,8 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { Card } from '@/components/ui/card';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { handleError, AppError } from '@/lib/errorHandler';
 
 interface Props {
   children: ReactNode;
@@ -10,94 +11,63 @@ interface Props {
 
 interface State {
   hasError: boolean;
-  error?: Error;
-  errorInfo?: ErrorInfo;
+  error: AppError | null;
 }
 
-class ErrorBoundary extends Component<Props, State> {
-  constructor(props: Props) {
-    super(props);
-    this.state = { hasError: false };
-  }
-
-  static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
-  }
-
-  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
-    this.setState({
-      error,
-      errorInfo,
-    });
-
-    // In a real app, you might want to log this to an error reporting service
-    // logErrorToService(error, errorInfo);
-  }
-
-  handleRetry = () => {
-    this.setState({ hasError: false, error: undefined, errorInfo: undefined });
+export class ErrorBoundary extends Component<Props, State> {
+  public state: State = {
+    hasError: false,
+    error: null,
   };
 
-  handleGoHome = () => {
-    window.location.href = '/';
+  public static getDerivedStateFromError(error: Error): State {
+    // Update state so the next render will show the fallback UI.
+    return { 
+      hasError: true, 
+      error: handleError(error, 'ErrorBoundary') 
+    };
+  }
+
+  public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    console.error("Uncaught error:", error, errorInfo);
+    // We could log this to an error reporting service here
+  }
+
+  private handleReload = () => {
+    window.location.reload();
   };
 
-  render() {
+  public render() {
     if (this.state.hasError) {
       if (this.props.fallback) {
         return this.props.fallback;
       }
 
       return (
-        <div className="min-h-screen bg-background flex items-center justify-center p-4">
-          <Card className="max-w-md w-full p-6 text-center">
-            <div className="text-6xl mb-4">⚠️</div>
-            <h2 className="text-2xl font-bold text-foreground mb-2">
-              Something went wrong
-            </h2>
-            <p className="text-muted-foreground mb-6">
-              We encountered an unexpected error. Please try refreshing the page or go back to the home page.
-            </p>
-
-            <div className="space-y-3">
-              <Button onClick={this.handleRetry} className="w-full">
-                <RefreshCw className="h-4 w-4 mr-2" />
-                Try Again
-              </Button>
-              <Button variant="outline" onClick={this.handleGoHome} className="w-full">
-                <Home className="h-4 w-4 mr-2" />
-                Go to Home
-              </Button>
-            </div>
-
-            {process.env.NODE_ENV === 'development' && this.state.error && (
-              <details className="mt-6 text-left">
-                <summary className="cursor-pointer text-sm font-medium text-muted-foreground hover:text-foreground">
-                  <AlertTriangle className="h-4 w-4 inline mr-1" />
-                  Error Details (Development)
-                </summary>
-                <div className="mt-2 p-3 bg-muted rounded text-xs font-mono overflow-auto max-h-40">
-                  <div className="mb-2">
-                    <strong>Error:</strong> {this.state.error.message}
-                  </div>
-                  <div>
-                    <strong>Stack:</strong>
-                    <pre className="whitespace-pre-wrap mt-1">
-                      {this.state.error.stack}
-                    </pre>
-                  </div>
-                  {this.state.errorInfo && (
-                    <div className="mt-2">
-                      <strong>Component Stack:</strong>
-                      <pre className="whitespace-pre-wrap mt-1">
-                        {this.state.errorInfo.componentStack}
-                      </pre>
-                    </div>
-                  )}
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 p-4">
+          <Card className="w-full max-w-md shadow-lg border-red-100">
+            <CardHeader className="text-center pb-2">
+              <div className="mx-auto bg-red-100 p-3 rounded-full w-16 h-16 flex items-center justify-center mb-4">
+                <AlertTriangle className="h-8 w-8 text-red-600" />
+              </div>
+              <CardTitle className="text-xl text-red-700">Something went wrong</CardTitle>
+            </CardHeader>
+            <CardContent className="text-center space-y-2">
+              <p className="text-gray-600">
+                We encountered an unexpected error. Our team has been notified.
+              </p>
+              {this.state.error && (
+                <div className="bg-gray-100 p-3 rounded text-sm font-mono text-left overflow-auto max-h-32 mt-4 text-gray-700 border border-gray-200">
+                  {this.state.error.message}
                 </div>
-              </details>
-            )}
+              )}
+            </CardContent>
+            <CardFooter className="justify-center pt-2">
+              <Button onClick={this.handleReload} className="gap-2">
+                <RefreshCw className="h-4 w-4" />
+                Reload Application
+              </Button>
+            </CardFooter>
           </Card>
         </div>
       );
@@ -106,5 +76,3 @@ class ErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
-
-export default ErrorBoundary;

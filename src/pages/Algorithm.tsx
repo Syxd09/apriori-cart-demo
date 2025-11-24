@@ -40,6 +40,7 @@ import {
   TrendingUp
 } from "lucide-react";
 import { runAprioriAlgorithm, sampleTransactions } from "@/lib/apriori";
+import AprioriSimulation from "@/components/AprioriSimulation";
 import Footer from "@/components/Footer";
 import type { FrequentItemset, AssociationRule, AlgorithmStep, ExampleRule } from "@/types";
 
@@ -567,7 +568,15 @@ const Algorithm = () => {
               <Card className="p-6">
                 <div className="flex items-center gap-3 mb-6">
                   <Play className="h-6 w-6 text-primary" />
-                  <h3 className="text-2xl font-bold">How Apriori Works: Step-by-Step Walkthrough</h3>
+                  <h3 className="text-2xl font-bold">Interactive Algorithm Simulation</h3>
+                </div>
+                <div className="mb-8">
+                  <AprioriSimulation />
+                </div>
+                
+                <div className="flex items-center gap-3 mb-6 pt-8 border-t">
+                  <BookOpen className="h-6 w-6 text-primary" />
+                  <h3 className="text-2xl font-bold">Theoretical Steps</h3>
                 </div>
                 <div className="space-y-4">
                   {algorithmSteps.map((step, index) => (
