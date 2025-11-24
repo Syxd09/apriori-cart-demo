@@ -40,6 +40,7 @@ const RecommendationCard: React.FC<ExtendedRecommendationCardProps> = ({
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [isDismissed, setIsDismissed] = useState(false);
+  const [imageError, setImageError] = useState(false);
 
   if (isDismissed) return null;
 
@@ -72,15 +73,16 @@ const RecommendationCard: React.FC<ExtendedRecommendationCardProps> = ({
 
   return (
     <TooltipProvider>
-      <Card className={`p-4 hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/20 ${className}`}>
-        <div className="flex items-start gap-4">
+      <Card className={`p-4 hover:shadow-lg transition-all duration-300 border-2 hover:border-primary/20 h-full flex flex-col overflow-hidden ${className}`}>
+        <div className="flex items-start gap-4 flex-1 min-w-0">
           {/* Product Image/Emoji */}
           <div className="flex-shrink-0">
-            {product.imageUrls && product.imageUrls.length > 0 ? (
+            {product.imageUrls && product.imageUrls.length > 0 && !imageError ? (
               <img
                 src={product.imageUrls[0]}
                 alt={product.name}
                 className="w-16 h-16 object-cover rounded-lg border"
+                onError={() => setImageError(true)}
               />
             ) : (
               <div className="w-16 h-16 bg-muted rounded-lg flex items-center justify-center text-2xl border" role="img" aria-label={`${product.name} emoji`}>
@@ -90,17 +92,17 @@ const RecommendationCard: React.FC<ExtendedRecommendationCardProps> = ({
           </div>
 
           {/* Main Content */}
-          <div className="flex-1 min-w-0">
+          <div className="flex-1 min-w-0 flex flex-col">
             {/* Header with Product Info */}
             <div className="flex items-start justify-between gap-2 mb-3">
-              <div className="flex-1">
-                <h3 className="font-bold text-foreground text-lg line-clamp-1 mb-1">
+              <div className="flex-1 min-w-0">
+                <h3 className="font-bold text-foreground text-lg line-clamp-1 mb-1 break-words">
                   {product.name}
                 </h3>
                 <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <span>{product.brand}</span>
+                  <span className="truncate">{product.brand}</span>
                   <span>•</span>
-                  <span>{product.category}</span>
+                  <span className="truncate">{product.category}</span>
                 </div>
                 <div className="flex items-center gap-1 mt-1">
                   {[...Array(5)].map((_, i) => (
@@ -118,7 +120,7 @@ const RecommendationCard: React.FC<ExtendedRecommendationCardProps> = ({
                   </span>
                 </div>
               </div>
-              <div className="text-right flex-shrink-0">
+              <div className="text-right flex-shrink-0 ml-2">
                 <div className="text-xl font-bold text-primary mb-1">
                   ₹{product.price.toFixed(2)}
                 </div>
@@ -134,11 +136,11 @@ const RecommendationCard: React.FC<ExtendedRecommendationCardProps> = ({
             <div className="bg-gradient-to-r from-primary/5 to-accent/5 rounded-lg p-3 border border-primary/10 mb-3">
               <div className="flex items-start gap-2">
                 <TrendingUp className="h-4 w-4 mt-0.5 shrink-0 text-primary" />
-                <div className="flex-1">
-                  <p className="font-medium text-foreground text-sm mb-1">
+                <div className="flex-1 min-w-0">
+                  <p className="font-medium text-foreground text-sm mb-1 break-words">
                     Why recommended: Frequently bought with {recommendation.reason.join(" and ")}
                   </p>
-                  <p className="text-xs text-muted-foreground mb-2">
+                  <p className="text-xs text-muted-foreground mb-2 break-words">
                     Customers who bought{" "}
                     <span className="font-medium text-primary">
                       {recommendation.reason.join(" and ")}
@@ -147,7 +149,7 @@ const RecommendationCard: React.FC<ExtendedRecommendationCardProps> = ({
                   </p>
 
                   {/* Quality Metrics */}
-                  <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                  <div className="grid grid-cols-2 gap-2 text-xs mt-2">
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <div className="space-y-1">
@@ -250,15 +252,15 @@ const RecommendationCard: React.FC<ExtendedRecommendationCardProps> = ({
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-2 mt-2 p-3 bg-muted/50 rounded-lg">
                   <div className="text-xs space-y-1">
-                    <div>
+                    <div className="break-words">
                       <strong>Antecedent:</strong> {rule.antecedent.join(" + ")}
                     </div>
-                    <div>
+                    <div className="break-words">
                       <strong>Consequent:</strong> {rule.consequent.join(" + ")}
                     </div>
                     <div className="pt-1 border-t">
                       <strong>How Apriori Works:</strong>
-                      <p className="text-muted-foreground mt-1">
+                      <p className="text-muted-foreground mt-1 break-words">
                         The Apriori algorithm finds frequent itemsets by iteratively generating candidate sets
                         and pruning those that don't meet minimum support thresholds. This rule was discovered
                         from analyzing {Math.round(recommendation.support * 10000)} out of 10,000+ transactions.
@@ -270,7 +272,7 @@ const RecommendationCard: React.FC<ExtendedRecommendationCardProps> = ({
             )}
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-2 mt-3">
+            <div className="flex items-center gap-2 mt-3 mt-auto">
               <Button
                 size="sm"
                 onClick={() => onAddToCart?.(product)}

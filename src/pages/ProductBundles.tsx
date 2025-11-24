@@ -42,7 +42,7 @@ const ProductBundles = () => {
         rules = JSON.parse(cachedRules);
       } else {
         // Compute fresh if needed
-        const { associationRules } = runAprioriAlgorithm(sampleTransactions, 0.01, 0.2);
+        const { associationRules } = runAprioriAlgorithm(sampleTransactions(), 0.01, 0.2);
         rules = associationRules;
       }
 

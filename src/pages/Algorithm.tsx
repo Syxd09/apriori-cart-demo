@@ -82,7 +82,7 @@ const Algorithm = () => {
   const [simulationStep, setSimulationStep] = useState<number>(0);
 
   useEffect(() => {
-    const { frequentItemsets, associationRules: rawRules } = runAprioriAlgorithm(sampleTransactions, 0.02, 0.25);
+    const { frequentItemsets, associationRules: rawRules } = runAprioriAlgorithm(sampleTransactions(), 0.02, 0.25);
     const associationRules = rawRules.filter(rule => (rule.lift || 0) > 1.1);
     setAlgorithmResults({ frequentItemsets, associationRules });
   }, []);

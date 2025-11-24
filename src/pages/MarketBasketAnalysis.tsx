@@ -51,7 +51,7 @@ const MarketBasketAnalysis = () => {
     if (cachedRules) {
       setRules(JSON.parse(cachedRules));
     } else {
-      runAlgorithm(sampleTransactions, 0.01, 0.1);
+      runAlgorithm(sampleTransactions(), 0.01, 0.1);
     }
   }, [runAlgorithm]);
 
@@ -89,7 +89,7 @@ const MarketBasketAnalysis = () => {
   }, [filteredRules]);
 
   const handleRecalculate = () => {
-    runAlgorithm(sampleTransactions, minSupport[0], minConfidence[0]);
+    runAlgorithm(sampleTransactions(), minSupport[0], minConfidence[0]);
     toast.info("Calculation started in background...");
   };
 

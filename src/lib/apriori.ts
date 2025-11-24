@@ -130,6 +130,7 @@ export function generateBasketForSegment(selectedSegment: CustomerSegment): stri
 }
 
 function generateRealisticTransactions(count: number = 2000): string[][] {
+  console.log('🔄 generateRealisticTransactions: Starting transaction generation...');
   const transactions: string[][] = [];
   const random = () => Math.random();
 
@@ -153,10 +154,31 @@ function generateRealisticTransactions(count: number = 2000): string[][] {
     }
   }
 
+  console.log('✅ generateRealisticTransactions: Completed, generated', transactions.length, 'transactions');
   return transactions;
 }
 
-export const sampleTransactions: string[][] = generateRealisticTransactions(2000);
+// Change to lazy generation to avoid blocking module load
+let _sampleTransactions: string[][] | null = null;
+export function getSampleTransactions(): string[][] {
+  if (!_sampleTransactions) {
+    console.log('📦 Generating sample transactions lazily...');
+    _sampleTransactions = generateRealisticTransactions(2000);
+  }
+  return _sampleTransactions;
+}
+
+// Lazy-loaded sample transactions
+export const sampleTransactions = (() => {
+  let cached: string[][] | null = null;
+  return () => {
+    if (!cached) {
+      console.log('📦 Generating sample transactions on first access...');
+      cached = generateRealisticTransactions(2000);
+    }
+    return cached;
+  };
+})();
 
 
 import type { FrequentItemset, AssociationRule } from "@/types";
